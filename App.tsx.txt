@@ -1,0 +1,648 @@
+import React, { useState, useEffect, useId } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { 
+  Plus, 
+  MapPin, 
+  Award, 
+  CheckCircle, 
+  Trash2, 
+  ChevronRight, 
+  Search, 
+  SlidersHorizontal,
+  Info,
+  Globe,
+  Upload,
+  Sparkles,
+  Camera
+} from "lucide-react";
+
+import { Coach } from "./types";
+import { PRELOADED_COACHES } from "./data";
+
+import Navbar from "./components/Navbar";
+import BenefitsSidebar from "./components/BenefitsSidebar";
+import Footer from "./components/Footer";
+import CoachCard from "./components/CoachCard";
+import LibraryTab from "./components/LibraryTab";
+import PricingTab from "./components/PricingTab";
+import AboutTab from "./components/AboutTab";
+import BookingModal from "./components/BookingModal";
+import LoginModal from "./components/LoginModal";
+
+// Interactive Sports Registration additions
+import RegistrationForm from "./components/RegistrationForm";
+import AdminDashboard from "./components/AdminDashboard";
+import CoachDashboard from "./components/CoachDashboard";
+import { LocalSportsDB } from "./utils/db";
+
+export default function App() {
+  // Navigation State: "apply" (Form), "coaches" (Index), "library" (Articles), "about" (Branding), "pricing" (Tiers)
+  const [currentTab, setCurrentTab] = useState<string>("apply");
+
+  // Coach Dataset State
+  const [coaches, setCoaches] = useState<Coach[]>([]);
+
+  // Modals Visibility
+  const [bookingCoach, setBookingCoach] = useState<Coach | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<{ email: string; name: string } | null>(null);
+
+  // Form Inputs State
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [primarySport, setPrimarySport] = useState("Track & Field");
+  const [category, setCategory] = useState("Strength & Conditioning");
+  const [experience, setExperience] = useState("");
+  const [monthlyFee, setMonthlyFee] = useState("");
+  const [certifications, setCertifications] = useState("");
+  const [bio, setBio] = useState("");
+  const [location, setLocation] = useState("");
+  const [languages, setLanguages] = useState("");
+  const [agreeTerms, setAgreeTerms] = useState(false);
+
+  // Photo Presets config for custom signup portrait selection
+  const PHOTO_PRESETS = [
+    { name: "Running Specialist", url: "https://images.unsplash.com/photo-1486218119243-13883505764c?auto=format&fit=crop&q=80&w=400" },
+    { name: "Strength Trainer", url: "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&q=80&w=400" },
+    { name: "Swimming Coach", url: "https://images.unsplash.com/photo-1530541930197-ff16ac917b0e?auto=format&fit=crop&q=80&w=400" },
+    { name: "Mental Performance Specialist", url: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400" }
+  ];
+  const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string>(PHOTO_PRESETS[0].url);
+
+  // Form submission feedback animation helpers
+  const [formStatus, setFormStatus] = useState<"idle" | "submitting" | "success">("idle");
+  const [notification, setNotification] = useState<{ message: string; type: "success" | "info" } | null>(null);
+
+  // Coaches Filter state in "Find Coaches" tab
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sportFilter, setSportFilter] = useState("All");
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [sortBy, setSortBy] = useState<"experience" | "feeAsc" | "feeDesc" | "rating">("rating");
+
+  // unique IDs for form elements
+  const fullNameId = useId();
+  const emailId = useId();
+  const passwordId = useId();
+  const mobileId = useId();
+  const primarySportId = useId();
+  const categoryId = useId();
+  const experienceId = useId();
+  const monthlyFeeId = useId();
+  const certificationsId = useId();
+  const bioId = useId();
+  const locationId = useId();
+  const languagesId = useId();
+  const agreeTermsId = useId();
+  const sportFilterId = useId();
+  const categoryFilterId = useId();
+  const sortById = useId();
+
+  // Simulated logged-in coach state for full dashboard exploration
+  const [activeLoggedInCoach, setActiveLoggedInCoach] = useState<{ fullName: string, primarySport: string } | null>(null);
+
+  // Initialize coaches database from LocalSportsDB
+  useEffect(() => {
+    syncCoachesList();
+  }, []);
+
+  const syncCoachesList = () => {
+    const roster = LocalSportsDB.getActiveCoaches();
+    setCoaches(roster);
+  };
+
+  const triggerToast = (message: string, type: "success" | "info" = "success") => {
+    setNotification({ message, type });
+    setTimeout(() => {
+      setNotification(null);
+    }, 4000);
+  };
+
+  const handleApplySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fullName || !email || !password || !mobile) {
+      triggerToast("Please fill out your basic credentials", "info");
+      return;
+    }
+
+    if (!agreeTerms) {
+      triggerToast("You must agree to the Coaching Standards and Terms", "info");
+      return;
+    }
+
+    setFormStatus("submitting");
+
+    setTimeout(() => {
+      setFormStatus("success");
+      
+      const newCoach: Coach = {
+        id: Date.now().toString(),
+        fullName,
+        email,
+        mobile,
+        primarySport,
+        category,
+        experience: Number(experience) || 1,
+        monthlyFee: Number(monthlyFee) || 250,
+        certifications: certifications || "Certified Trainer",
+        bio: bio || "Dedicated athletic coach passionate about high performance training optimization.",
+        location: location || "Austin, TX",
+        languages: languages || "English",
+        photoUrl: selectedPhotoUrl,
+        rating: 5.0,
+        reviewsCount: 1,
+        isVerified: true
+      };
+
+      const revisedList = [newCoach, ...coaches];
+      setCoaches(revisedList);
+      localStorage.setItem("athlete_coach_connect_dataset", JSON.stringify(revisedList));
+
+      // Auto login after verification signup!
+      setCurrentUser({ email: newCoach.email, name: newCoach.fullName });
+
+      triggerToast(`Congratulations! Coach ${newCoach.fullName} is now Verified on Athlete Coach Connect.`);
+
+      setTimeout(() => {
+        // Reset form inputs
+        setFullName("");
+        setEmail("");
+        setPassword("");
+        setMobile("");
+        setExperience("");
+        setMonthlyFee("");
+        setCertifications("");
+        setBio("");
+        setLocation("");
+        setLanguages("");
+        setAgreeTerms(false);
+        setFormStatus("idle");
+
+        // Smooth switch to coaches dashboard index
+        setCurrentTab("coaches");
+      }, 1500);
+
+    }, 1600);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    triggerToast("Logged out successfully", "info");
+  };
+
+  const handleDemoteCoach = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const isConfirmed = window.confirm("Are you sure you want to remove this coach profile from local storage?");
+    if (isConfirmed) {
+      const revised = coaches.filter(c => c.id !== id);
+      setCoaches(revised);
+      localStorage.setItem("athlete_coach_connect_dataset", JSON.stringify(revised));
+      triggerToast("Coach profile removed.", "info");
+    }
+  };
+
+  // Filter application calculation logic
+  const filteredCoaches = coaches.filter(coach => {
+    const matchesSearch = 
+      coach.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      coach.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      coach.certifications.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesSport = sportFilter === "All" || coach.primarySport === sportFilter;
+    const matchesCategory = categoryFilter === "All" || coach.category === categoryFilter;
+
+    return matchesSearch && matchesSport && matchesCategory;
+  }).sort((a, b) => {
+    if (sortBy === "experience") return b.experience - a.experience;
+    if (sortBy === "feeAsc") return a.monthlyFee - b.monthlyFee;
+    if (sortBy === "feeDesc") return b.monthlyFee - a.monthlyFee;
+    if (sortBy === "rating") return (b.rating || 5) - (a.rating || 5);
+    return 0;
+  });
+
+  return (
+    <div className="bg-[#0A0A0A] text-[#E8E8E8] min-h-screen flex flex-col font-sans relative selection:bg-brand-primary selection:text-white overflow-x-hidden">
+      
+      {/* Backstage ambient glows from Artistic Flair Theme */}
+      <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none overflow-hidden z-0">
+        <div className="absolute top-[-10%] xleft-[-10%] w-[50%] h-[50%] rounded-full bg-gradient-to-br from-[#FF3E00] to-transparent blur-[120px] pointer-events-none"></div>
+        <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] rounded-full bg-gradient-to-tl from-[#FF3E00] to-transparent blur-[100px] pointer-events-none"></div>
+      </div>
+
+      {/* Toast notifications handler banner */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-24 right-4 z-50 max-w-sm w-full bg-[#121212] text-[#E8E8E8] p-5 rounded-none shadow-2xl border border-[#FF3E00]/40 flex items-start gap-4 backdrop-blur-md"
+          >
+            <div className="p-1 rounded-none bg-brand-primary/10 text-brand-primary">
+              <CheckCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#FF3E00]">
+                {notification.type === "success" ? "System Success" : "Information"}
+              </p>
+              <p className="text-xs text-[#E8E8E8] mt-1.5 leading-relaxed font-light">
+                {notification.message}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Primary Header Navbar */}
+      <Navbar 
+        currentTab={currentTab} 
+        onNavigate={(tab) => {
+          setCurrentTab(tab);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+        onOpenLogin={() => setShowLoginModal(true)}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+      />
+
+      {/* Main Container Core */}
+      <main className="flex-1 flex flex-col">
+        <AnimatePresence mode="wait">
+          
+          {/* TAB 1: Coach Application Sign Up */}
+          {currentTab === "apply" && (
+            <motion.div 
+              key="apply-tab"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="flex-1 flex flex-col md:flex-row"
+            >
+              {/* Left Column Sidebar */}
+              <BenefitsSidebar />
+
+              {/* Right Column Registration Space */}
+              <section className="flex-1 bg-[#121212]/40 px-6 py-12 md:px-16 flex flex-col border-l border-white/5 z-10">
+                <div className="max-w-3xl w-full mx-auto space-y-8">
+                  <RegistrationForm
+                    onSuccess={(newApp) => {
+                      triggerToast(`Application submitted! ${newApp.fullName} is awaiting administrative review.`, "success");
+                      // Automatically set activeLoggedInCoach candidate configuration
+                      setActiveLoggedInCoach({
+                        fullName: newApp.fullName,
+                        primarySport: newApp.primarySport
+                      });
+                      // Navigate to Admin Gate so they can approve themselves to test!
+                      setCurrentTab("admin");
+                    }}
+                    triggerToast={triggerToast}
+                  />
+                </div>
+              </section>
+            </motion.div>
+          )}
+
+          {/* TAB 1.1: ADMIN APPLICATION WORKFLOW GATE */}
+          {currentTab === "admin" && (
+            <motion.div
+              key="admin-tab"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 w-full max-w-7xl mx-auto px-6 py-12 space-y-8 z-10"
+            >
+              <AdminDashboard 
+                onRosterChanged={() => {
+                  syncCoachesList();
+                }}
+                triggerToast={triggerToast}
+              />
+            </motion.div>
+          )}
+
+          {/* TAB 1.2: ACTIVE FULLY BINDED COACH DASHBOARD PANEL */}
+          {currentTab === "coach-panel" && (
+            <motion.div
+              key="coach-panel-tab"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 w-full max-w-7xl mx-auto px-6 py-12 space-y-8 z-10"
+            >
+              {activeLoggedInCoach ? (
+                <div className="space-y-6">
+                  {/* Active Simulator Control Toolbar */}
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 bg-[#121212] border border-white/10 gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
+                      <span className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">
+                        Simulating Active Dashboard session for <strong className="text-white font-medium">{activeLoggedInCoach.fullName}</strong>
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setActiveLoggedInCoach(null);
+                        triggerToast("Logged out of coach session simulation.", "info");
+                      }}
+                      className="text-[9px] uppercase tracking-widest bg-stone-900 hover:bg-neutral-800 text-zinc-300 font-bold border border-white/5 py-1.5 px-3 pointer-events-auto cursor-pointer"
+                    >
+                      🚪 Exit Simulator
+                    </button>
+                  </div>
+
+                  <CoachDashboard 
+                    coachName={activeLoggedInCoach.fullName} 
+                    coachSport={activeLoggedInCoach.primarySport} 
+                    triggerToast={triggerToast} 
+                  />
+                </div>
+              ) : (
+                /* Unauthenticated coach dashboard landing selection portal */
+                <div className="max-w-2xl mx-auto py-12 space-y-8 text-center bg-[#0E0E0E] p-8 md:p-12 border border-white/5">
+                  <div className="space-y-3">
+                    <span className="text-[10px] uppercase tracking-[0.35em] text-[#FF3E00] font-black">Locker Room Authentication Grid</span>
+                    <h2 className="font-serif-artistic text-3xl font-light italic text-white md:text-4xl">Coach Profile Gateway</h2>
+                    <p className="text-xs text-neutral-400 font-light max-w-md mx-auto leading-relaxed">
+                      Select or log in as any active roster coach to view their custom metrics, training programs, team chat broadcasts, and joint angles overlay analyzer.
+                    </p>
+                  </div>
+
+                  {/* Option list of registered coaches */}
+                  <div className="space-y-3 text-left pt-4">
+                    <span className="text-[9px] uppercase tracking-wider font-extrabold text-neutral-500 block">Available Verified Coaches Group:</span>
+                    <div className="grid grid-cols-1 gap-2.5">
+                      {coaches.map(co => (
+                        <div key={co.id} className="p-4 bg-[#161616] border border-white/5 flex justify-between items-center hover:border-[#FF3E00]/30 transition-all">
+                          <div className="flex items-center gap-3">
+                            <img src={co.photoUrl} alt="" className="w-9 h-9 object-cover border border-white/10" />
+                            <div>
+                              <h4 className="font-serif-artistic text-white italic text-sm">{co.fullName}</h4>
+                              <p className="text-[10px] text-[#9E9E9E]">ID: <span className="text-brand-primary">{co.id}</span> · Sport: <strong className="text-white font-medium">{co.primarySport}</strong></p>
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              setActiveLoggedInCoach({
+                                fullName: co.fullName,
+                                primarySport: co.primarySport
+                              });
+                              triggerToast(`Fast logged in as Coach ${co.fullName}!`, "success");
+                            }}
+                            className="bg-brand-primary hover:bg-white text-white hover:text-black font-semibold text-[10px] tracking-wider uppercase px-4 py-2 transition-colors cursor-pointer"
+                          >
+                            🔒 Sim Entrada
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/5 pt-6 text-xs text-neutral-500 font-light space-y-1">
+                    <p>💡 <span className="text-brand-primary font-medium">Testing Rule:</span> Want to register as a custom sport candidate?</p>
+                    <p>Click "Join Now" in top navbar, sign up, clear SMS OTP, then head over to "🛡️ Admin Gate" to approve yourself!</p>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* TAB 2: Find Coaches directory search list */}
+          {currentTab === "coaches" && (
+            <motion.div
+              key="coaches-tab"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 w-full max-w-7xl mx-auto px-6 py-12 space-y-8 z-10"
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
+                <div className="space-y-1.5">
+                  <span className="text-[10px] uppercase tracking-[0.4em] font-bold text-brand-primary block">
+                    DIRECTORY REGISTRY
+                  </span>
+                  <h2 className="font-serif-artistic text-4xl italic font-light text-white leading-tight">
+                    Connect with Verified Elite Coaches
+                  </h2>
+                  <p className="text-xs text-[#9E9E9E] font-sans tracking-wide font-light">
+                    Filter by sport, focus, location, or credentials. Real connections, not mockups.
+                  </p>
+                </div>
+                
+                {/* Search Bar filter */}
+                <div className="relative md:w-80 w-full shrink-0">
+                  <Search className="w-4 h-4 text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <label htmlFor="coachSearch" className="sr-only">Search Coaches</label>
+                  <input
+                    id="coachSearch"
+                    type="text"
+                    placeholder="Search name, city, certificates..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full h-11 pl-10 pr-4 bg-[#0E0E0E] text-white border border-white/10 rounded-none text-xs focus:outline-none focus:border-brand-primary placeholder:text-neutral-600 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Filters Matrix Control Area */}
+              <div className="bg-[#161616] p-6 rounded-none border border-white/10 shadow-xl grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                
+                {/* Categorization focus */}
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor={categoryFilterId} className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-primary">
+                    Coaching Focus
+                  </label>
+                  <select
+                    id={categoryFilterId}
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="h-10 border border-white/10 rounded-none px-3 bg-[#0E0E0E] text-xs font-semibold focus:outline-none text-[#E8E8E8]"
+                  >
+                    <option value="All">All Categories</option>
+                    <option value="Strength & Conditioning">Strength & Conditioning</option>
+                    <option value="Technical/Skills">Technical/Skills</option>
+                    <option value="Mental Performance">Mental Performance</option>
+                    <option value="Nutrition">Nutrition</option>
+                  </select>
+                </div>
+
+                {/* Sport selector */}
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor={sportFilterId} className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-primary">
+                    Sport Discipline
+                  </label>
+                  <select
+                    id={sportFilterId}
+                    value={sportFilter}
+                    onChange={(e) => setSportFilter(e.target.value)}
+                    className="h-10 border border-white/10 rounded-none px-3 bg-[#0E0E0E] text-xs font-semibold focus:outline-none text-[#E8E8E8]"
+                  >
+                    <option value="All">All Sports</option>
+                    <option>Football</option>
+                    <option>Basketball</option>
+                    <option>Track & Field</option>
+                    <option>Swimming</option>
+                    <option>Tennis</option>
+                    <option>Golf</option>
+                    <option>Rugby</option>
+                    <option>Cycling</option>
+                  </select>
+                </div>
+
+                {/* Sort selector */}
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor={sortById} className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-primary">
+                    Sort Roster By
+                  </label>
+                  <select
+                    id={sortById}
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="h-10 border border-white/10 rounded-none px-3 bg-[#0E0E0E] text-xs font-semibold focus:outline-none text-[#E8E8E8]"
+                  >
+                    <option value="rating">Top Rated (Stars)</option>
+                    <option value="experience">Years of Experience</option>
+                    <option value="feeAsc">Rate: Low to High</option>
+                    <option value="feeDesc">Rate: High to Low</option>
+                  </select>
+                </div>
+
+                {/* Action button summary reset */}
+                <div className="flex justify-end gap-2 pt-4 md:pt-0">
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSportFilter("All");
+                      setCategoryFilter("All");
+                      setSortBy("rating");
+                    }}
+                    className="h-10 px-4 rounded-none bg-[#0E0E0E] hover:bg-white hover:text-[#0A0A0A] border border-white/10 text-[10px] tracking-widest font-bold uppercase transition-colors text-[#9E9E9E] font-headline cursor-pointer"
+                  >
+                    Reset Grid
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Trigger new coach signup prompt
+                      setCurrentTab("apply");
+                    }}
+                    className="h-10 px-4 rounded-none bg-brand-primary hover:bg-[#E8E8E8] hover:text-black border border-brand-primary text-white text-[10px] tracking-widest font-bold uppercase transition-colors flex items-center gap-1 cursor-pointer font-headline"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Apply as Coach</span>
+                  </button>
+                </div>
+
+              </div>
+
+              {/* Roster Grid list */}
+              {filteredCoaches.length === 0 ? (
+                <div className="text-center bg-[#161616] border border-dashed border-white/10 py-16 rounded-none">
+                  <p className="text-white font-serif-artistic italic text-lg leading-relaxed">No matching verified coaches found.</p>
+                  <p className="text-xs text-[#9E9E9E] mt-1.5 max-w-sm mx-auto font-sans font-light">
+                    Try adjusting search terms, selecting a different sport format, or become the first certified specialist in this category!
+                  </p>
+                  <button
+                    onClick={() => { setSearchQuery(""); setSportFilter("All"); setCategoryFilter("All"); }}
+                    className="mt-6 px-4 py-2 border border-white/10 hover:border-brand-primary bg-[#0E0E0E] text-white hover:text-brand-primary rounded-none text-[10px] tracking-widest font-bold uppercase cursor-pointer transition-colors"
+                  >
+                    Clear Filter parameters
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredCoaches.map(coach => (
+                    <div key={coach.id} className="relative group">
+                      {/* Delete button only if the coach was manually registered for developer convenience */}
+                      {coach.id !== "1" && coach.id !== "2" && coach.id !== "3" && coach.id !== "4" && coach.id !== "5" && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDemoteCoach(coach.id, e)}
+                          title="Purge manual signup from local storage"
+                          className="absolute bottom-16 left-6 z-20 p-2.5 bg-[#750A13] text-white hover:bg-[#A81020] rounded-none border border-red-900 transition-colors cursor-pointer flex items-center justify-center opacity-85 hover:opacity-100"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <CoachCard 
+                        coach={coach}
+                        onBookConsultation={(c) => setBookingCoach(c)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* TAB 3: Library Performance Articles */}
+          {currentTab === "library" && (
+            <motion.div
+              key="library-tab"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 w-full max-w-5xl mx-auto px-6 py-10"
+            >
+              <LibraryTab />
+            </motion.div>
+          )}
+
+          {/* TAB 4: About athletic missions */}
+          {currentTab === "about" && (
+            <motion.div
+              key="about-tab"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 w-full max-w-5xl mx-auto px-6 py-10"
+            >
+              <AboutTab />
+            </motion.div>
+          )}
+
+          {/* TAB 5: Interactive Pricing Tiers */}
+          {currentTab === "pricing" && (
+            <motion.div
+              key="pricing-tab"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 w-full max-w-6xl mx-auto px-6 py-10"
+            >
+              <PricingTab />
+            </motion.div>
+          )}
+
+        </AnimatePresence>
+      </main>
+
+      {/* Web Footer section */}
+      <Footer onNavigate={(tab) => {
+        setCurrentTab(tab);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }} />
+
+      {/* Interactive Booker Modal Overlay */}
+      {bookingCoach && (
+        <BookingModal 
+          coach={bookingCoach} 
+          onClose={() => setBookingCoach(null)} 
+        />
+      )}
+
+      {/* Interactive Sign in authentication Overlay */}
+      {showLoginModal && (
+        <LoginModal 
+          onClose={() => setShowLoginModal(false)}
+          onLoginSuccess={(user) => {
+            setCurrentUser(user);
+            triggerToast(`Welcome back, ${user.name}!`);
+          }}
+        />
+      )}
+
+    </div>
+  );
+}
