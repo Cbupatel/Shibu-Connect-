@@ -1,0 +1,6 @@
+{
+  "name": "Athlete Coach Connect",
+  "description": "A platform connecting elite performance coaches with athletes. Apply as a coach, filter profiles, search resources, and manage performance benchmarks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
